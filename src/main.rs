@@ -1,10 +1,10 @@
-use arboard::Clipboard;
+mod common;
+
+use common::clipboard;
 
 fn main() {
-	let mut clipboard = Clipboard::new().unwrap();
-	println!("Clipboard text was: {}", clipboard.get_text().unwrap());
-
-	let the_string = "Hello, UniClipboard!";
-	clipboard.set_text(the_string.into()).unwrap();
-	println!("But now the clipboard text should be: \"{}\"", the_string);
+	println!("get clipboard: {}", clipboard::get());
+	let s = "123 Test";
+    clipboard::set(s.to_string());
+	println!("set clipboard: {}", s);
 }
