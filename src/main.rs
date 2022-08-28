@@ -4,6 +4,8 @@ use common::clipboard;
 use common::message;
 
 fn main() {
+    message::welcome();
+    
     println!("get clipboard: {}", clipboard::get());
     let s = "123 Test";
     clipboard::set(s.to_string());
