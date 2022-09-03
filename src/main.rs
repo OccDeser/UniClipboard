@@ -4,6 +4,8 @@ mod datatype;
 use clap::Parser;
 use common::clipboard;
 use common::message;
+use common::uniclip;
+use datatype::RemoteClipboard;
 
 #[derive(Parser, Debug)]
 #[clap(author, version, about = None, long_about = None)]
@@ -26,22 +28,29 @@ fn init_local_clipboard(args: Args) -> datatype::LocalClipboard {
         message::warning("Use the default password, which may be a security risk.".to_string());
     }
 
-    let mut peers = Vec::new();
+    let mut peer = datatype::RemoteClipboard {
+        host: "".to_string(),
+        port: 0,
+    };
     if args.remote.ne("nopeer") {
         let words: Vec<&str> = args.remote.split(":").collect();
         if words.len() > 2 {
-            message::error("invalid remote host".to_string());
+            message::error(format!("Invalid remote host \"{}\"", args.remote));
             std::process::exit(-1);
         } else {
             if words.len() == 2 {
-                let host = words[0].to_string();
-                let port = words[1].parse::<u16>().unwrap();
-                peers.push(datatype::RemoteClipboard { host, port });
+                peer.host = words[0].to_string();
+                peer.port = match words[1].parse::<u16>() {
+                    Ok(port) => port,
+                    Err(_) => {
+                        message::error(format!("Invalid remote port \"{}\"", words[1]));
+                        std::process::exit(-1);
+                    }
+                };
             } else {
                 message::warning("The remote port is not set, use the local port.".to_string());
-                let host = words[0].to_string();
-                let port = args.port;
-                peers.push(datatype::RemoteClipboard { host, port });
+                peer.host = words[0].to_string();
+                peer.port = args.port;
             }
         }
     }
@@ -49,7 +58,10 @@ fn init_local_clipboard(args: Args) -> datatype::LocalClipboard {
     datatype::LocalClipboard {
         port: args.port,
         password: args.password,
-        peers: peers,
+        peer: RemoteClipboard {
+            host: peer.host,
+            port: peer.port,
+        },
     }
 }
 
@@ -58,11 +70,8 @@ fn main() {
     let local_clipboard = init_local_clipboard(args);
     println!("port: {}", local_clipboard.port);
     println!("password: {}", local_clipboard.password);
-    println!("peers: {}", local_clipboard.peers.len());
-    if local_clipboard.peers.len()>0{
-        println!("peer_host: {}", local_clipboard.peers[0].host);
-        println!("peer_port: {}", local_clipboard.peers[0].port);
-    }
+    println!("peer_host: {}", local_clipboard.peer.host);
+    println!("peer_port: {}", local_clipboard.peer.port);
 
     message::welcome();
 

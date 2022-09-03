@@ -29,3 +29,7 @@ pub fn warning(msg: String) {
 pub fn error(msg: String) {
     println!("{}: {}", "error".red().bold(), msg);
 }
+
+pub fn info(msg: String) {
+    println!("{}", msg);
+}
