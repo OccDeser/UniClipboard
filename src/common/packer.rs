@@ -1,5 +1,5 @@
 use super::super::datatype::{
-    UniclipCommand, UniclipDataFrame, UniclipPayload, UNICLIP_MAGIC, UNICLIP_PROTO_VERSION,
+    UniclipDataFrame, UniclipPayload, UNICLIP_MAGIC, UNICLIP_PROTO_VERSION,
 };
 use super::message;
 use hex::decode;
@@ -33,7 +33,6 @@ pub fn unpack(data: Vec<u8>, key: &SharedKey) -> UniclipDataFrame {
                 return UniclipDataFrame {
                     magic: UNICLIP_MAGIC,
                     version: UNICLIP_PROTO_VERSION,
-                    command: UniclipCommand::Error,
                     payload: UniclipPayload::Error(String::from("Invalid magic number")),
                 };
             } else if data.version != UNICLIP_PROTO_VERSION {
@@ -41,7 +40,6 @@ pub fn unpack(data: Vec<u8>, key: &SharedKey) -> UniclipDataFrame {
                 return UniclipDataFrame {
                     magic: UNICLIP_MAGIC,
                     version: UNICLIP_PROTO_VERSION,
-                    command: UniclipCommand::Error,
                     payload: UniclipPayload::Error(String::from("Invalid protocol version")),
                 };
             } else {
@@ -53,7 +51,6 @@ pub fn unpack(data: Vec<u8>, key: &SharedKey) -> UniclipDataFrame {
             return UniclipDataFrame {
                 magic: UNICLIP_MAGIC,
                 version: UNICLIP_PROTO_VERSION,
-                command: UniclipCommand::Error,
                 payload: UniclipPayload::Error(String::from("Unable to decrypt data frame")),
             };
         }
