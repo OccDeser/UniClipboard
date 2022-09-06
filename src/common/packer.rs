@@ -17,42 +17,35 @@ pub fn pwd2key(password: String) -> SharedKey {
     SharedKey::new(hash)
 }
 
-pub fn pack(data_frame: UniclipDataFrame, key: &SharedKey) -> Vec<u8> {
+pub fn pack(data: UniclipPayload, key: &SharedKey) -> Vec<u8> {
+    let data_frame = UniclipDataFrame{
+        magic: UNICLIP_MAGIC,
+        version: UNICLIP_PROTO_VERSION,
+        payload: data,
+    };
     let encrypted_data = data_frame.encrypt(key).unwrap();
     let serialized_data = encrypted_data.serialize();
     serialized_data
 }
 
-pub fn unpack(data: Vec<u8>, key: &SharedKey) -> UniclipDataFrame {
+pub fn unpack(data: Vec<u8>, key: &SharedKey) -> UniclipPayload {
     let encrypted_data = EncryptedMessage::deserialize(data).unwrap();
     let data_frame = UniclipDataFrame::decrypt_owned(&encrypted_data, key);
     match data_frame {
         Ok(data) => {
             if data.magic != UNICLIP_MAGIC {
                 message::error(String::from("UNPACK ERROR, Invalid magic number"));
-                return UniclipDataFrame {
-                    magic: UNICLIP_MAGIC,
-                    version: UNICLIP_PROTO_VERSION,
-                    payload: UniclipPayload::Error(String::from("Invalid magic number")),
-                };
+                return UniclipPayload::Error(String::from("Invalid magic number"));
             } else if data.version != UNICLIP_PROTO_VERSION {
                 message::error(String::from("UNPACK ERROR, Invalid protocol version"));
-                return UniclipDataFrame {
-                    magic: UNICLIP_MAGIC,
-                    version: UNICLIP_PROTO_VERSION,
-                    payload: UniclipPayload::Error(String::from("Invalid protocol version")),
-                };
+                return UniclipPayload::Error(String::from("Invalid protocol version"));
             } else {
-                return data;
+                return data.payload;
             }
         }
         Err(_) => {
             message::error(String::from("UNPACK ERROR, Unable to decrypt data frame"));
-            return UniclipDataFrame {
-                magic: UNICLIP_MAGIC,
-                version: UNICLIP_PROTO_VERSION,
-                payload: UniclipPayload::Error(String::from("Unable to decrypt data frame")),
-            };
+            return UniclipPayload::Error(String::from("Unable to decrypt data frame"));
         }
     }
 }

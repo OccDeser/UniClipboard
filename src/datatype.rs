@@ -15,6 +15,7 @@ pub struct LocalClipboard {
 
 pub const UNICLIP_MAGIC: u16 = ('U' as u16) << 8 | 'C' as u16;
 pub const UNICLIP_PROTO_VERSION: u8 = 1;
+pub const UNICLIP_DATA_LIMIT: usize = 5 * 1024;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum UniclipBig {
@@ -25,22 +26,19 @@ pub enum UniclipBig {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum UniclipPayload {
-    Echo(u32),      // random number A
-    EchoRes(u32),   // A + 1
+    Echo(u32),    // random number A
+    EchoRes(u32), // A + 1
 
     Peer(u32),                          // random number A
-    PeerRes(u32, Vec<RemoteClipboard>), // A + 1, peers
+    PeerList(u32, Vec<RemoteClipboard>), // A + 1, peers
 
-    Connect(u32, u16),      // random number A, local prot
-    ConnectRes(u32),        // A + 1
+    Update(String, Vec<u8>), // data hash, data
+    UpdateRes(u32),          // received data length
 
-    Update(String, Vec<u8>),        // data hash, data
-    UpdateRes(u32),                 // received data length
-
-    UpdateBig(String, UniclipBig, u32),     // data hash, data type, data frame size
-    UpdateBigAck(String, u32),              // data hash, data frame size
-    UpdateBigData(Vec<u8>),                 // data
-    UpdateBigFinish(u32),                   // data length
+    UpdateBig(String, UniclipBig, u32), // data hash, data type, data frame size
+    UpdateBigAck(String, u32),          // data hash, data frame size
+    UpdateBigData(Vec<u8>),             // data
+    UpdateBigFinish(u32),               // data length
 
     Quit(u32),    // A
     QuitRes(u32), // A + 1
