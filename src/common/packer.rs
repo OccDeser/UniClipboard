@@ -18,7 +18,7 @@ pub fn pwd2key(password: String) -> SharedKey {
 }
 
 pub fn pack(data: UniclipPayload, key: &SharedKey) -> Vec<u8> {
-    let data_frame = UniclipDataFrame{
+    let data_frame = UniclipDataFrame {
         magic: UNICLIP_MAGIC,
         version: UNICLIP_PROTO_VERSION,
         payload: data,
@@ -48,4 +48,25 @@ pub fn unpack(data: Vec<u8>, key: &SharedKey) -> UniclipPayload {
             return UniclipPayload::Error(String::from("Unable to decrypt data frame"));
         }
     }
+}
+
+pub trait Hash<T> {
+    fn hash(data: T) -> String;
+}
+
+impl Hash<&Vec<u8>> for &Vec<u8> {
+    fn hash(data: &Vec<u8>) -> String {
+        let data = std::str::from_utf8(data).unwrap();
+        digest(data)
+    }
+}
+
+impl Hash<&String> for &String {
+    fn hash(data: &String) -> String {
+        digest(data.as_str())
+    }
+}
+
+pub fn hash<T: Hash<T>>(data: T) -> String {
+    T::hash(data)
 }

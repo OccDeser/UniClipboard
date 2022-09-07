@@ -105,6 +105,7 @@ impl UniclipPeerHandler {
     }
 }
 
+static mut PORT: u16 = 0;
 static mut PEERS: MaybeUninit<Mutex<Vec<RemoteClipboard>>> = MaybeUninit::uninit();
 static mut HANDLERS: MaybeUninit<Mutex<Vec<UniclipPeerHandler>>> = MaybeUninit::uninit();
 
@@ -133,6 +134,18 @@ fn handle(index: usize) {
                         UniclipPayload::PeerList(rand_a + 1, (*peers).lock().unwrap().clone());
                     handler.send(res);
                 }
+                UniclipPayload::Port(rand_a) => {
+                    let port = PORT;
+                    let res = UniclipPayload::PortRes(rand_a + 1, port);
+                    handler.send(res);
+                }
+                UniclipPayload::Update(hash, data) => {
+                    let data_hash = packer::hash(&data);
+                    if hash == data_hash {
+                        clipboard::set(data);
+                    }
+                }
+
                 _ => {
                     message::error("Invalid uniclip data.".to_string());
                     std::process::exit(-1);
@@ -194,6 +207,16 @@ fn get_peers() {
     }
 }
 
+fn broadcast(data: UniclipPayload) {
+    unsafe {
+        let handlers = HANDLERS.as_mut_ptr();
+        let handlers = (*handlers).lock().unwrap();
+        for handler in handlers.iter() {
+            handler.send(data.clone());
+        }
+    }
+}
+
 pub struct Uniclip {
     port: u16,
     key: SharedKey,
@@ -209,6 +232,8 @@ impl Uniclip {
             get_peers();
         }
 
+        unsafe { PORT = local_clip.port.clone() };
+
         Uniclip {
             port: local_clip.port,
             key,
@@ -217,7 +242,10 @@ impl Uniclip {
     }
 
     fn listen_hotkey() {
-        println!("RECEIVED HOTKEY");
+        let text = clipboard::get();
+        let hash = packer::hash(&text);
+        let data = UniclipPayload::Update(hash, text);
+        broadcast(data);
     }
 
     fn listen_port(&self) {

@@ -41,7 +41,7 @@ pub enum UniclipPayload {
     Port(u32),          // random number A
     PortRes(u32, u16),  // A + 1, port
 
-    Update(String, Vec<u8>), // data hash, data
+    Update(String, String), // data hash, data
     UpdateRes(u32),          // received data length
 
     UpdateBig(String, UniclipBig, u32), // data hash, data type, data frame size
