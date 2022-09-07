@@ -2,9 +2,8 @@ mod common;
 mod datatype;
 
 use clap::Parser;
-use common::clipboard;
-use common::message;
-use common::uniclip;
+use common::hotkey::Keycode;
+use common::{message, uniclip};
 use datatype::RemoteClipboard;
 
 #[derive(Parser, Debug)]
@@ -73,7 +72,15 @@ fn main() {
     println!("peer_host: {}", local_clipboard.peer.host);
     println!("peer_port: {}", local_clipboard.peer.port);
 
+    uniclip::init();
+    let mut uniclip = uniclip::Uniclip::new(
+        &local_clipboard,
+        vec![Keycode::LControl, Keycode::LShift, Keycode::C],
+    );
+    uniclip.start();
+
     message::welcome();
 
-    message::success("Finished".to_string(), "success".to_string());
+    // message::success("Finished".to_string(), "success".to_string());
+    loop {}
 }

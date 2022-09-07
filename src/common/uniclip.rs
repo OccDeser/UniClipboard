@@ -1,12 +1,13 @@
 use super::super::datatype::{LocalClipboard, RemoteClipboard, UniclipPayload, UNICLIP_DATA_LIMIT};
 
 use super::{clipboard, hotkey, message, packer};
-use hotkey::Hotkey;
+use hotkey::{Hotkey, HotkeyManager};
 use rand::prelude::*;
 use serde_encrypt::shared_key::SharedKey;
 use std::io::{Read, Write};
+use std::mem::MaybeUninit;
 use std::net::{TcpListener, TcpStream};
-use std::sync::{Arc, Mutex};
+use std::sync::Mutex;
 use std::thread;
 
 pub struct UniclipPeerHandler {
@@ -26,145 +27,232 @@ impl UniclipPeerHandler {
         };
         UniclipPeerHandler { key, stream }
     }
-}
 
-#[derive(Debug, Clone)]
-pub struct Uniclip {
-    port: u16,
-    key: SharedKey,
-    remote: RemoteClipboard,
-    copy_keys: Vec<hotkey::Keycode>,
-    paste_keys: Vec<hotkey::Keycode>,
-}
+    pub fn send(&self, data: UniclipPayload) {
+        let key = &self.key;
+        let mut stream = &self.stream;
 
-impl Uniclip {
-    pub fn new(
-        local_clip: LocalClipboard,
-        copy_keys: Vec<hotkey::Keycode>,
-        paste_keys: Vec<hotkey::Keycode>,
-    ) -> Uniclip {
-        Uniclip {
-            port: local_clip.port,
-            key: packer::pwd2key(local_clip.password),
-            remote: local_clip.peer,
-            copy_keys,
-            paste_keys,
-        }
-    }
-}
+        let buf = packer::pack(data, key);
+        let buffer = buf.as_slice();
 
-fn send(data: UniclipPayload, handler: &UniclipPeerHandler) {
-    let key = &handler.key;
-    let stream = &handler.stream;
+        let res = stream.write(&buffer);
 
-    let buf = packer::pack(data, key);
-    let buffer = buf.as_slice();
-
-    let res = stream.write(&buffer);
-
-    match res {
-        Ok(_) => (),
-        Err(error) => {
-            message::error(format!("{}", error));
-        }
-    }
-}
-
-fn recv(handler: &UniclipPeerHandler) -> UniclipPayload {
-    let key = &handler.key;
-    let stream = &handler.stream;
-
-    let mut buffer = [0; UNICLIP_DATA_LIMIT];
-    let res = stream.read(&mut buffer);
-
-    match res {
-        Ok(_) => (),
-        Err(error) => {
-            message::error(format!("{}", error));
-        }
-    }
-
-    let data = packer::unpack(Vec::from(buffer), key);
-    data
-}
-
-fn recv_big(handler: &UniclipPeerHandler, big_size: usize) -> UniclipPayload {
-    let key = &handler.key;
-    let stream = &handler.stream;
-
-    let mut buffer = vec![0u8; big_size + UNICLIP_DATA_LIMIT];
-    let res = stream.read(&mut buffer);
-
-    match res {
-        Ok(_) => (),
-        Err(error) => {
-            message::error(format!("{}", error));
-        }
-    }
-
-    let data = packer::unpack(Vec::from(buffer), key);
-    data
-}
-
-fn get_peers(remote: RemoteClipboard, key: &SharedKey) -> Arc<Mutex<Vec<UniclipPeerHandler>>> {
-    let mut peers = Vec::new();
-    peers.push(UniclipPeerHandler::new(key.clone(), remote));
-
-    // request peer list
-    let rand_a: u32 = random();
-    let data = UniclipPayload::Peer(rand_a);
-    send(data, &peers[0]);
-
-    // receive peer list
-    let data = recv(&peers[0]);
-    let peers = match data {
-        UniclipPayload::PeerList(rand_b, peer_list) => {
-            if rand_a + 1 == rand_b {
-                for peer in peer_list {
-                    peers.push(UniclipPeerHandler::new(key.clone(), peer));
-                }
-                peers
-            } else {
-                Vec::new()
-            }
-        }
-        _ => {
-            message::error("Invalid peer list".to_string());
-            std::process::exit(-1);
-        }
-    };
-
-    Arc::new(Mutex::new(peers))
-}
-
-fn listen_peers(uniclip: Uniclip, peers: Arc<Mutex<Vec<UniclipPeerHandler>>>) {
-    let listener = TcpListener::bind(format!("127.0.0.1:{}", uniclip.port)).unwrap();
-    for stream in listener.incoming() {
-        match stream {
-            Ok(stream) => {
-                let handler = UniclipPeerHandler {
-                    key: uniclip.key.clone(),
-                    stream,
-                };
-                peers.lock().unwrap().push(handler);
-            }
+        match res {
+            Ok(_) => (),
             Err(error) => {
                 message::error(format!("{}", error));
             }
         }
     }
+
+    pub fn recv(&self) -> UniclipPayload {
+        let key = &self.key;
+        let mut stream = &self.stream;
+
+        let mut buffer = [0; UNICLIP_DATA_LIMIT];
+        let res = stream.read(&mut buffer);
+
+        match res {
+            Ok(_) => (),
+            Err(error) => {
+                message::error(format!("{}", error));
+            }
+        }
+
+        let data = packer::unpack(Vec::from(buffer), key);
+        data
+    }
+
+    pub fn recv_big(&self, big_size: usize) -> UniclipPayload {
+        let key = &self.key;
+        let mut stream = &self.stream;
+
+        let mut buffer = vec![0u8; big_size + UNICLIP_DATA_LIMIT];
+        let res = stream.read(&mut buffer);
+
+        match res {
+            Ok(_) => (),
+            Err(error) => {
+                message::error(format!("{}", error));
+            }
+        }
+
+        let data = packer::unpack(Vec::from(buffer), key);
+        data
+    }
+
+    pub fn address(&self) -> RemoteClipboard {
+        let host = self.stream.peer_addr().unwrap().ip().to_string();
+
+        let rand_a: u32 = random();
+        self.send(UniclipPayload::Port(rand_a));
+        let data = self.recv();
+        let port: u16 = match data {
+            UniclipPayload::PortRes(rand_b, port) => {
+                if rand_a + 1 == rand_b {
+                    port
+                } else {
+                    0
+                }
+            }
+            _ => {
+                message::error("Invalid uniclip data.".to_string());
+                std::process::exit(-1);
+            }
+        };
+
+        RemoteClipboard { host, port }
+    }
 }
 
-fn listen_copy() {}
+static mut PEERS: MaybeUninit<Mutex<Vec<RemoteClipboard>>> = MaybeUninit::uninit();
+static mut HANDLERS: MaybeUninit<Mutex<Vec<UniclipPeerHandler>>> = MaybeUninit::uninit();
 
-fn listen_paste() {}
+pub fn init() {
+    unsafe {
+        let peers = PEERS.as_mut_ptr();
+        peers.write(Mutex::new(Vec::new()));
+        let handlers = HANDLERS.as_mut_ptr();
+        handlers.write(Mutex::new(Vec::new()));
+    }
+}
 
-pub fn run(uniclip: Uniclip) {
-    let mut hk_manager = hotkey::HotkeyManager::new();
-    hk_manager.register(Hotkey::new(uniclip.copy_keys.clone(), listen_copy));
-    hk_manager.register(Hotkey::new(uniclip.paste_keys.clone(), listen_paste));
-    hk_manager.listen();
+fn handle(index: usize) {
+    thread::spawn(move || unsafe {
+        let handlers = HANDLERS.as_mut_ptr().read();
+        let handler = &handlers.lock().unwrap()[index];
+        loop {
+            let data = handler.recv();
+            match data {
+                UniclipPayload::Echo(data) => {
+                    handler.send(UniclipPayload::EchoRes(data + 1));
+                }
+                UniclipPayload::Peer(rand_a) => {
+                    let peers = PEERS.as_ptr();
+                    let res =
+                        UniclipPayload::PeerList(rand_a + 1, (*peers).lock().unwrap().clone());
+                    handler.send(res);
+                }
+                _ => {
+                    message::error("Invalid uniclip data.".to_string());
+                    std::process::exit(-1);
+                }
+            }
+        }
+    });
+}
 
-    let peers = get_peers(uniclip.remote.clone(), &uniclip.key);
-    thread::spawn(move || listen_peers(uniclip, peers));
+fn add_handler(handler: UniclipPeerHandler) {
+    unsafe {
+        let handlers = HANDLERS.as_mut_ptr();
+        let mut handlers = (*handlers).lock().unwrap();
+        let handler_ind = handlers.len();
+        handlers.push(handler);
+        handle(handler_ind);
+    }
+}
+
+fn add_peer(key: &SharedKey, remote: &RemoteClipboard) {
+    unsafe {
+        let peers = PEERS.as_mut_ptr();
+        (*peers).lock().unwrap().push(remote.clone());
+        add_handler(UniclipPeerHandler::new(key.clone(), remote.clone()));
+    }
+}
+
+fn get_peers() {
+    unsafe {
+        let peers = PEERS.as_mut_ptr();
+        let peers = (*peers).lock().unwrap();
+        let handlers = HANDLERS.as_mut_ptr();
+        let handlers = (*handlers).lock().unwrap();
+        if handlers.len() > 0 {
+            let handler = handlers.last().unwrap();
+            let rand_a: u32 = random();
+            handler.send(UniclipPayload::Peer(rand_a));
+            let data = handler.recv();
+            let peer_list = match data {
+                UniclipPayload::PeerList(rand_b, peer_list) => {
+                    if rand_a + 1 == rand_b {
+                        peer_list
+                    } else {
+                        message::error("Uniclip: PeerList error".to_string());
+                        return;
+                    }
+                }
+                _ => {
+                    message::error("Uniclip: PeerList error".to_string());
+                    return;
+                }
+            };
+            for p in peer_list.iter() {
+                if !peers.contains(p) {
+                    add_peer(&handler.key, p);
+                }
+            }
+        }
+    }
+}
+
+pub struct Uniclip {
+    port: u16,
+    key: SharedKey,
+    hotkey: Vec<hotkey::Keycode>,
+}
+
+impl Uniclip {
+    pub fn new(local_clip: &LocalClipboard, hotkey: Vec<hotkey::Keycode>) -> Uniclip {
+        let key = packer::pwd2key(local_clip.password.clone());
+
+        if local_clip.peer.port != 0 {
+            add_peer(&key, &local_clip.peer);
+            get_peers();
+        }
+
+        Uniclip {
+            port: local_clip.port,
+            key,
+            hotkey,
+        }
+    }
+
+    fn listen_hotkey() {
+        println!("RECEIVED HOTKEY");
+    }
+
+    fn listen_port(&self) {
+        let key = self.key.clone();
+        let listener = TcpListener::bind(format!("127.0.0.1:{}", self.port));
+
+        thread::spawn(move || unsafe {
+            let peers = PEERS.as_mut_ptr();
+            let handlers = HANDLERS.as_mut_ptr();
+
+            // 判断是否有新的连接
+            for stream in listener.unwrap().incoming() {
+                match stream {
+                    Ok(stream) => {
+                        let handler = UniclipPeerHandler {
+                            key: key.clone(),
+                            stream,
+                        };
+                        (*peers).lock().unwrap().push(handler.address());
+                        (*handlers).lock().unwrap().push(handler);
+                    }
+                    Err(error) => {
+                        message::error(format!("{}", error));
+                    }
+                }
+            }
+        });
+    }
+
+    pub fn start(&mut self) {
+        let mut hk_manager = HotkeyManager::new();
+        let hk = Hotkey::new(self.hotkey.clone(), Self::listen_hotkey);
+        hk_manager.register(hk);
+        hk_manager.listen();
+
+        self.listen_port();
+    }
 }

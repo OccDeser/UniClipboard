@@ -7,6 +7,12 @@ pub struct RemoteClipboard {
     pub port: u16,
 }
 
+impl PartialEq for RemoteClipboard {
+    fn eq(&self, other: &Self) -> bool {
+        self.host == other.host && self.port == other.port
+    }
+}
+
 pub struct LocalClipboard {
     pub port: u16,
     pub password: String,
@@ -29,8 +35,11 @@ pub enum UniclipPayload {
     Echo(u32),    // random number A
     EchoRes(u32), // A + 1
 
-    Peer(u32),                          // random number A
-    PeerList(u32, Vec<RemoteClipboard>), // A + 1, peers
+    Peer(u32),                              // random number A
+    PeerList(u32, Vec<RemoteClipboard>),    // A + 1, peers
+
+    Port(u32),          // random number A
+    PortRes(u32, u16),  // A + 1, port
 
     Update(String, Vec<u8>), // data hash, data
     UpdateRes(u32),          // received data length
