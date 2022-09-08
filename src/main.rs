@@ -65,12 +65,9 @@ fn init_local_clipboard(args: Args) -> datatype::LocalClipboard {
 }
 
 fn main() {
+    message::welcome();
     let args = Args::parse();
     let local_clipboard = init_local_clipboard(args);
-    println!("port: {}", local_clipboard.port);
-    println!("password: {}", local_clipboard.password);
-    println!("peer_host: {}", local_clipboard.peer.host);
-    println!("peer_port: {}", local_clipboard.peer.port);
 
     uniclip::init();
     let mut uniclip = uniclip::Uniclip::new(
@@ -79,8 +76,8 @@ fn main() {
     );
     uniclip.start();
 
-    message::welcome();
 
-    // message::success("Finished".to_string(), "success".to_string());
+    message::success("Running".to_string(), format!("UniClipboard is running on port {}.", local_clipboard.port));
+
     loop {}
 }
