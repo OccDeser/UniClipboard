@@ -55,6 +55,7 @@ impl HotkeyManager {
                 std::thread::sleep(std::time::Duration::from_millis(100));
                 let keys_down = device_state.get_keys();
                 if keys_down.ne(&keys) {
+                    println!("keys: {:?}", keys_down);
                     keys = keys_down.clone();
                     Self::check_hooks(keys_down, &hot_keys);
                 }

@@ -52,14 +52,16 @@ impl UniclipPeerHandler {
         let mut buffer = [0; UNICLIP_DATA_LIMIT];
         let res = stream.read(&mut buffer);
 
-        match res {
-            Ok(_) => (),
+       let size =  match res {
+            Ok(s) => s,
             Err(error) => {
                 message::error(format!("{}", error));
+                0
             }
-        }
+        };
 
-        let data = packer::unpack(Vec::from(buffer), key);
+        let buf = &buffer[0..size];
+        let data = packer::unpack(Vec::from(buf), key);
         data
     }
 
@@ -166,6 +168,10 @@ fn add_handler(handler: UniclipPeerHandler) {
 }
 
 fn add_peer(key: &SharedKey, remote: &RemoteClipboard) {
+    message::success(
+        "success".to_string(),
+        format!("Connected to {}", remote.host),
+    );
     unsafe {
         let peers = PEERS.as_mut_ptr();
         (*peers).lock().unwrap().push(remote.clone());
@@ -243,6 +249,8 @@ impl Uniclip {
 
     fn listen_hotkey() {
         let text = clipboard::get();
+        // message::info(format!("debug: Read clipboard data: {}", text));
+        println!("debug: Read clipboard data: {}", text);
         let hash = packer::hash(&text);
         let data = UniclipPayload::Update(hash, text);
         broadcast(data);
@@ -250,7 +258,7 @@ impl Uniclip {
 
     fn listen_port(&self) {
         let key = self.key.clone();
-        let listener = TcpListener::bind(format!("127.0.0.1:{}", self.port));
+        let listener = TcpListener::bind(format!("0.0.0.0:{}", self.port));
 
         thread::spawn(move || unsafe {
             let peers = PEERS.as_mut_ptr();

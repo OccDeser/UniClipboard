@@ -25,10 +25,12 @@ pub fn pack(data: UniclipPayload, key: &SharedKey) -> Vec<u8> {
     };
     let encrypted_data = data_frame.encrypt(key).unwrap();
     let serialized_data = encrypted_data.serialize();
+    println!("SEND DATA: {:?}", serialized_data);
     serialized_data
 }
 
 pub fn unpack(data: Vec<u8>, key: &SharedKey) -> UniclipPayload {
+    println!("RECV DATA: {:?}", data);
     let encrypted_data = EncryptedMessage::deserialize(data).unwrap();
     let data_frame = UniclipDataFrame::decrypt_owned(&encrypted_data, key);
     match data_frame {
