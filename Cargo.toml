@@ -10,7 +10,7 @@ hex = "0.4.3"
 rand = "0.8.5"
 sha256 = "1.0.3"
 arboard = "2.1.1"
-colorful = "0.2.1"
+term-painter = "0.3.0"
 device_query = "1.1.1"
 serde-encrypt = "0.7.0"
 serde = { version = "1.0", features = ["derive"] }
