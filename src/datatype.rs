@@ -35,25 +35,44 @@ pub enum UniclipPayload {
     Echo(u32),    // random number A
     EchoRes(u32), // A + 1
 
-    Peer(u32),                              // random number A
-    PeerList(u32, Vec<RemoteClipboard>),    // A + 1, peers
+    Peer(u32),                           // random number A
+    PeerList(u32, Vec<RemoteClipboard>), // A + 1, peers
 
-    Port(u32),          // random number A
-    PortRes(u32, u16),  // A + 1, port
+    Port(u32),         // random number A
+    PortRes(u32, u16), // A + 1, port
 
     Update(String, String), // data hash, data
-    UpdateRes(u32),          // received data length
+    UpdateRes(usize),       // received data length
 
     UpdateBig(String, UniclipBig, u32), // data hash, data type, data frame size
     UpdateBigAck(String, u32),          // data hash, data frame size
     UpdateBigData(Vec<u8>),             // data
-    UpdateBigFinish(u32),               // data length
+    UpdateBigFinish(usize),             // data length
 
     Quit(u32),    // A
     QuitRes(u32), // A + 1
 
     ShutDown,      // no payload
     Error(String), // error message
+}
+
+pub mod PayloadType {
+    pub const ECHO: &str = "Echo";
+    pub const ECHO_RES: &str = "EchoRes";
+    pub const PEER: &str = "Peer";
+    pub const PEER_LIST: &str = "PeerList";
+    pub const PORT: &str = "Port";
+    pub const PORT_RES: &str = "PortRes";
+    pub const UPDATE: &str = "Update";
+    pub const UPDATE_RES: &str = "UpdateRes";
+    pub const UPDATE_BIG: &str = "UpdateBig";
+    pub const UPDATE_BIG_ACK: &str = "UpdateBigAck";
+    pub const UPDATE_BIG_DATA: &str = "UpdateBigData";
+    pub const UPDATE_BIG_FINISH: &str = "UpdateBigFinish";
+    pub const QUIT: &str = "Quit";
+    pub const QUIT_RES: &str = "QuitRes";
+    pub const SHUT_DOWN: &str = "ShutDown";
+    pub const ERROR: &str = "Error";
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
