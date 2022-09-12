@@ -56,23 +56,27 @@ pub enum UniclipPayload {
     Error(String), // error message
 }
 
-pub mod PayloadType {
-    pub const ECHO: &str = "Echo";
-    pub const ECHO_RES: &str = "EchoRes";
-    pub const PEER: &str = "Peer";
-    pub const PEER_LIST: &str = "PeerList";
-    pub const PORT: &str = "Port";
-    pub const PORT_RES: &str = "PortRes";
-    pub const UPDATE: &str = "Update";
-    pub const UPDATE_RES: &str = "UpdateRes";
-    pub const UPDATE_BIG: &str = "UpdateBig";
-    pub const UPDATE_BIG_ACK: &str = "UpdateBigAck";
-    pub const UPDATE_BIG_DATA: &str = "UpdateBigData";
-    pub const UPDATE_BIG_FINISH: &str = "UpdateBigFinish";
-    pub const QUIT: &str = "Quit";
-    pub const QUIT_RES: &str = "QuitRes";
-    pub const SHUT_DOWN: &str = "ShutDown";
-    pub const ERROR: &str = "Error";
+pub mod payload_type {
+    use lazy_static::lazy_static;
+
+    lazy_static! {
+        pub static ref ECHO: String = "Echo".to_string();
+        pub static ref ECHO_RES: String = "EchoRes".to_string();
+        pub static ref PEER: String = "Peer".to_string();
+        pub static ref PEER_LIST: String = "PeerList".to_string();
+        pub static ref PORT: String = "Port".to_string();
+        pub static ref PORT_RES: String = "PortRes".to_string();
+        pub static ref UPDATE: String = "Update".to_string();
+        pub static ref UPDATE_RES: String = "UpdateRes".to_string();
+        pub static ref UPDATE_BIG: String = "UpdateBig".to_string();
+        pub static ref UPDATE_BIG_ACK: String = "UpdateBigAck".to_string();
+        pub static ref UPDATE_BIG_DATA: String = "UpdateBigData".to_string();
+        pub static ref UPDATE_BIG_FINISH: String = "UpdateBigFinish".to_string();
+        pub static ref QUIT: String = "Quit".to_string();
+        pub static ref QUIT_RES: String = "QuitRes".to_string();
+        pub static ref SHUT_DOWN: String = "ShutDown".to_string();
+        pub static ref ERROR: String = "Error".to_string();
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

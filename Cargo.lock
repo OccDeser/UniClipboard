@@ -1067,6 +1067,7 @@ dependencies = [
  "clap",
  "device_query",
  "hex",
+ "lazy_static",
  "rand",
  "serde",
  "serde-encrypt",

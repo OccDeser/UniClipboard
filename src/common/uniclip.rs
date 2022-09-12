@@ -1,7 +1,7 @@
-use crate::datatype::PayloadType::PEER;
+use crate::datatype::payload_type::PEER;
 
 use super::super::datatype::{
-    LocalClipboard, PayloadType, RemoteClipboard, UniclipPayload, UNICLIP_DATA_LIMIT,
+    LocalClipboard, payload_type, RemoteClipboard, UniclipPayload, UNICLIP_DATA_LIMIT,
 };
 
 use super::{clipboard, hotkey, message, packer};
@@ -22,7 +22,7 @@ struct MQItem {
 }
 
 static mut PORT: u16 = 0;
-static mut MQ: MaybeUninit<Mutex<HashMap<&str, Vec<MQItem>>>> = MaybeUninit::uninit();
+static mut MQ: MaybeUninit<Mutex<HashMap<String, Vec<MQItem>>>> = MaybeUninit::uninit();
 static mut PEERS: MaybeUninit<Mutex<Vec<RemoteClipboard>>> = MaybeUninit::uninit();
 static mut HANDLERS: MaybeUninit<Mutex<Vec<UniclipPeerHandler>>> = MaybeUninit::uninit();
 
@@ -35,13 +35,13 @@ pub fn init() {
 
         let mq = MQ.as_mut_ptr();
         let mut mq_data = HashMap::new();
-        mq_data.insert(PayloadType::PORT_RES, Vec::new());
-        mq_data.insert(PayloadType::ECHO_RES, Vec::new());
-        mq_data.insert(PayloadType::UPDATE, Vec::new());
-        mq_data.insert(PayloadType::UPDATE_RES, Vec::new());
-        mq_data.insert(PayloadType::UPDATE_BIG_ACK, Vec::new());
-        mq_data.insert(PayloadType::UPDATE_BIG_FINISH, Vec::new());
-        mq_data.insert(PayloadType::QUIT_RES, Vec::new());
+        mq_data.insert(payload_type::PORT_RES.clone(), Vec::new());
+        mq_data.insert(payload_type::ECHO_RES.clone(), Vec::new());
+        mq_data.insert(payload_type::UPDATE.clone(), Vec::new());
+        mq_data.insert(payload_type::UPDATE_RES.clone(), Vec::new());
+        mq_data.insert(payload_type::UPDATE_BIG_ACK.clone(), Vec::new());
+        mq_data.insert(payload_type::UPDATE_BIG_FINISH.clone(), Vec::new());
+        mq_data.insert(payload_type::QUIT_RES.clone(), Vec::new());
         mq.write(Mutex::new(mq_data));
     }
 }
@@ -64,7 +64,7 @@ fn handle(index: usize) {
                     handler.send(UniclipPayload::EchoRes(data + 1));
                 }
                 UniclipPayload::EchoRes(..) => {
-                    insert(index, PayloadType::ECHO_RES, data);
+                    insert(index, &payload_type::ECHO_RES, data);
                 }
                 UniclipPayload::Peer(rand_a) => {
                     let peers = PEERS.as_ptr();
@@ -73,7 +73,7 @@ fn handle(index: usize) {
                     handler.send(res);
                 }
                 UniclipPayload::PeerList(..) => {
-                    insert(index, PayloadType::PEER_LIST, data);
+                    insert(index, &payload_type::PEER_LIST, data);
                 }
                 UniclipPayload::Port(rand_a) => {
                     let port = PORT;
@@ -81,7 +81,7 @@ fn handle(index: usize) {
                     handler.send(res);
                 }
                 UniclipPayload::PortRes(..) => {
-                    insert(index, PayloadType::PORT_RES, data);
+                    insert(index, &payload_type::PORT_RES, data);
                 }
                 UniclipPayload::Update(hash, data) => {
                     let data_hash = packer::hash(&data);
@@ -95,7 +95,7 @@ fn handle(index: usize) {
                     }
                 }
                 UniclipPayload::UpdateRes(..) => {
-                    insert(index, PayloadType::UPDATE_RES, data);
+                    insert(index, &payload_type::UPDATE_RES, data);
                 }
                 _ => {
                     message::error("Invalid uniclip data.".to_string());
@@ -106,7 +106,7 @@ fn handle(index: usize) {
     });
 }
 
-fn insert(index: usize, mtype: &str, data: UniclipPayload) {
+fn insert(index: usize, mtype: &String, data: UniclipPayload) {
     unsafe {
         let mq = MQ.as_mut_ptr();
         let mut mq = (*mq).lock().unwrap();
@@ -114,7 +114,7 @@ fn insert(index: usize, mtype: &str, data: UniclipPayload) {
     }
 }
 
-fn acquire(index: usize, mtype: &str) -> UniclipPayload {
+fn acquire(index: usize, mtype: &String) -> UniclipPayload {
     unsafe {
         let mq = MQ.as_mut_ptr();
         let mut mq = (*mq).lock().unwrap();
@@ -161,7 +161,7 @@ fn add_stream(key: &SharedKey, stream: TcpStream) {
     let rand_a: u32 = random();
     handler.send(UniclipPayload::Port(rand_a));
     let index = add_handler(handler);
-    let data = acquire(index, PayloadType::PORT_RES);
+    let data = acquire(index, &payload_type::PORT_RES);
     let port: u16 = match data {
         UniclipPayload::PortRes(rand_b, port) => {
             if rand_a + 1 == rand_b {
@@ -192,7 +192,7 @@ fn get_peers() {
             let handler = handlers.last().unwrap();
             let rand_a: u32 = random();
             handler.send(UniclipPayload::Peer(rand_a));
-            let data = acquire(handler.index, PayloadType::PEER_LIST);
+            let data = acquire(handler.index, &payload_type::PEER_LIST);
             println!("DATA: {:?}", data);
             let peer_list = match data {
                 UniclipPayload::PeerList(rand_b, peer_list) => {
