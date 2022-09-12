@@ -5,18 +5,15 @@ use super::super::datatype::{
 };
 
 use super::{clipboard, hotkey, message, packer};
-use arboard::Error;
 use hotkey::{Hotkey, HotkeyManager};
 use rand::prelude::*;
-use serde::__private::de;
 use serde_encrypt::shared_key::SharedKey;
 use std::collections::HashMap;
 use std::io::{Read, Write};
 use std::mem::MaybeUninit;
 use std::net::{TcpListener, TcpStream};
 use std::sync::Mutex;
-use std::time;
-use std::{default, thread};
+use std::{thread, time};
 
 struct MQItem {
     index: usize,
@@ -52,18 +49,21 @@ pub fn init() {
 fn handle(index: usize) {
     thread::spawn(move || unsafe {
         let handlers = HANDLERS.as_mut_ptr().read();
-        let handler = &handlers.lock().unwrap()[index];
+
         let need_big = false;
         let big_size: usize = 0;
         loop {
             let data: UniclipPayload;
             if !need_big {
+                let handler = &handlers.lock().unwrap()[index];
                 data = handler.recv();
             } else {
+                let handler = &handlers.lock().unwrap()[index];
                 data = handler.recv_big(big_size);
             }
             match data {
                 UniclipPayload::Echo(data) => {
+                    let handler = &handlers.lock().unwrap()[index];
                     handler.send(UniclipPayload::EchoRes(data + 1));
                 }
                 UniclipPayload::EchoRes(..) => {
@@ -73,6 +73,7 @@ fn handle(index: usize) {
                     let peers = PEERS.as_ptr();
                     let res =
                         UniclipPayload::PeerList(rand_a + 1, (*peers).lock().unwrap().clone());
+                    let handler = &handlers.lock().unwrap()[index];
                     handler.send(res);
                 }
                 UniclipPayload::PeerList(..) => {
@@ -81,6 +82,7 @@ fn handle(index: usize) {
                 UniclipPayload::Port(rand_a) => {
                     let port = PORT;
                     let res = UniclipPayload::PortRes(rand_a + 1, port);
+                    let handler = &handlers.lock().unwrap()[index];
                     handler.send(res);
                 }
                 UniclipPayload::PortRes(..) => {
@@ -91,9 +93,11 @@ fn handle(index: usize) {
                     if hash == data_hash {
                         let res = UniclipPayload::UpdateRes(data.len());
                         clipboard::set(data);
+                        let handler = &handlers.lock().unwrap()[index];
                         handler.send(res);
                     } else {
                         let res = UniclipPayload::Error("Update text hash error".to_string());
+                        let handler = &handlers.lock().unwrap()[index];
                         handler.send(res);
                     }
                 }
@@ -152,6 +156,9 @@ fn add_handler(mut handler: UniclipPeerHandler) -> usize {
         let handler_ind = handlers.len();
         handler.set_index(handler_ind);
         handlers.push(handler);
+
+        drop(handlers);
+
         handle(handler_ind);
         handler_ind
     }
@@ -198,12 +205,12 @@ fn add_stream(key: &SharedKey, stream: TcpStream) {
 
 fn get_peers() {
     unsafe {
-        let peers = PEERS.as_mut_ptr();
-        let peers = (*peers).lock().unwrap();
         let handlers = HANDLERS.as_mut_ptr();
         let handlers = (*handlers).lock().unwrap();
         if handlers.len() > 0 {
             let handler = handlers.last().unwrap();
+            drop(handlers);
+
             let rand_a: u32 = random();
             handler.send(UniclipPayload::Peer(rand_a));
             let data = acquire(handler.index, &payload_type::PEER_LIST);
@@ -222,6 +229,9 @@ fn get_peers() {
                     return;
                 }
             };
+
+            let peers = PEERS.as_mut_ptr();
+            let peers = (*peers).lock().unwrap();
             for p in peer_list.iter() {
                 if !peers.contains(p) {
                     add_peer(&handler.key, p);
