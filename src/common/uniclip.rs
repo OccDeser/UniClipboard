@@ -37,6 +37,7 @@ pub fn init() {
         let mut mq_data = HashMap::new();
         mq_data.insert(payload_type::PORT_RES.clone(), Vec::new());
         mq_data.insert(payload_type::ECHO_RES.clone(), Vec::new());
+        mq_data.insert(payload_type::PEER_LIST.clone(), Vec::new());
         mq_data.insert(payload_type::UPDATE.clone(), Vec::new());
         mq_data.insert(payload_type::UPDATE_RES.clone(), Vec::new());
         mq_data.insert(payload_type::UPDATE_BIG_ACK.clone(), Vec::new());
