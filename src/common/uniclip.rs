@@ -1,20 +1,22 @@
 use crate::datatype::payload_type::PEER;
 
 use super::super::datatype::{
-    LocalClipboard, payload_type, RemoteClipboard, UniclipPayload, UNICLIP_DATA_LIMIT,
+    payload_type, LocalClipboard, RemoteClipboard, UniclipPayload, UNICLIP_DATA_LIMIT,
 };
 
 use super::{clipboard, hotkey, message, packer};
+use arboard::Error;
 use hotkey::{Hotkey, HotkeyManager};
 use rand::prelude::*;
+use serde::__private::de;
 use serde_encrypt::shared_key::SharedKey;
 use std::collections::HashMap;
 use std::io::{Read, Write};
 use std::mem::MaybeUninit;
 use std::net::{TcpListener, TcpStream};
 use std::sync::Mutex;
-use std::thread;
 use std::time;
+use std::{default, thread};
 
 struct MQItem {
     index: usize,
@@ -117,17 +119,28 @@ fn insert(index: usize, mtype: &String, data: UniclipPayload) {
 
 fn acquire(index: usize, mtype: &String) -> UniclipPayload {
     unsafe {
-        let mq = MQ.as_mut_ptr();
-        let mut mq = (*mq).lock().unwrap();
         loop {
-            let queue = mq.get_mut(mtype).unwrap();
-            for i in 0..queue.len() {
-                if queue[i].index == index {
-                    let data = queue.remove(i);
-                    return data.data;
+            let find = || {
+                let mq = MQ.as_mut_ptr();
+                let mut mq = (*mq).lock().unwrap();
+                let queue = mq.get_mut(mtype).unwrap();
+                for i in 0..queue.len() {
+                    if queue[i].index == index {
+                        let data = queue.remove(i);
+                        return data.data;
+                    }
+                }
+                UniclipPayload::Error("None".to_string())
+            };
+            let data = find();
+            match data {
+                UniclipPayload::Error(..) => {
+                    thread::sleep(time::Duration::from_millis(10));
+                }
+                _ => {
+                    return data;
                 }
             }
-            thread::sleep(time::Duration::from_millis(10));
         }
     };
 }
